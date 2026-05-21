@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EXEC-OS // Twiney</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0908; --bg-raised: #13110f; --bg-sunken: #070605; --surface: #181513;
+    --border: #2a2520; --border-bright: #3a342c;
+    --text: #f4ede0; --text-dim: #9a9088; --text-faint: #5c554d;
+    --brass: #c9a256; --cyan: #6dbed6; --red: #d96b5c; --green: #7fa86b; --amber: #e3b04b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: 'Geist', -apple-system, sans-serif; overflow: hidden; }
+  #root { height: 100vh; }
+  @keyframes execspin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .spin { animation: execspin 0.9s linear infinite; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg-sunken); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+  button:focus, input:focus, textarea:focus { outline: none; }
+  textarea, input { font-family: inherit; }
+</style>
+</head>
+<body>
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#c9a256;font-family:monospace;font-size:11px;letter-spacing:2px;">BOOTING EXEC-OS...</div></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const T = {
+  bg:"#0a0908", bgRaised:"#13110f", bgSunken:"#070605", surface:"#181513",
+  border:"#2a2520", borderBright:"#3a342c",
+  text:"#f4ede0", textDim:"#9a9088", textFaint:"#5c554d",
+  brass:"#c9a256", cyan:"#6dbed6", red:"#d96b5c", green:"#7fa86b", amber:"#e3b04b",
+};
+const FF = {
+  display:"'Fraunces', Georgia, serif",
+  body:"'Geist', -apple-system, sans-serif",
+  mono:"'JetBrains Mono', ui-monospace, monospace",
+};
+
+const SYSTEM_PROMPT = `You are EXEC-OS — Twiney's personal AI Chief of Staff.
+
+Twiney is Antoine W. Riley Sr., Director of Systems Maintenance at Crothall Healthcare, managing the full MedStar Health portfolio (10 hospitals: MWHC, MGUH, MMMC, MUMH, MHH, MGSH, MSMHC, MSMH, MNRH, MFSHC). He reports to Heather C. West. Active work includes Building X BAS controls (Limbach), summer cooling readiness, PM compliance libraries, the MWHC turnover checklist, and proprietary tools MedStarH2OLog and Load Lever.
+
+VOICE: Direct. Technically precise. Executive-appropriate. Plain prose over bullet-heavy formats unless the deliverable demands a list. No hyphens as structural punctuation. Concise — every sentence earns its place.
+
+OUTPUT: Operational. Twiney should be able to use what you produce without editing. If you don't have enough context, say what's missing in one line and proceed with the best assumption clearly stated.
+
+NEVER fabricate vendor names, dates, ticket numbers, hospital codes, or specifics you don't have. If asked about something you don't know, say so plainly.`;
+
+// ---------- ICONS ----------
+const Icon = ({ name, size=14, color="currentColor" }) => {
+  const P = {
+    dash:<g><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></g>,
+    term:<g><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></g>,
+    brain:<path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-1.04M12 4.5a2.5 2.5 0 0 1 4.96-.44 2.5 2.5 0 0 1 2.96 3.08 3 3 0 0 1 .34 5.58 2.5 2.5 0 0 1-1.32 4.24 2.5 2.5 0 0 1-4.44 1.04"/>,
+    mail:<g><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></g>,
+    file:<g><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></g>,
+    cog:<g><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></g>,
+    search:<g><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></g>,
+    send:<g><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></g>,
+    spark:<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/>,
+    trash:<g><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></g>,
+    copy:<g><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></g>,
+    load:<g><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></g>,
+    chev:<polyline points="9 18 15 12 9 6"/>,
+    arrow:<g><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></g>,
+    alert:<g><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></g>,
+    check:<g><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></g>,
+    timer:<g><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><polyline points="9 1 15 1"/></g>,
+    target:<g><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></g>,
+    flame:<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>,
+    list:<g><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></g>,
+    tri:<polygon points="12 2 22 20 2 20 12 2"/>,
+    hex:<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>,
+    zap:<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
+    key:<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>,
+    pause:<g><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></g>,
+  };
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,display:"inline-block",verticalAlign:"middle"}}>{P[name] || null}</svg>;
+};
+
+// ---------- STORAGE (localStorage) ----------
+const LS = {
+  get: (k, fb) => { try { const v = localStorage.getItem("execos:" + k); return v ? JSON.parse(v) : fb; } catch { return fb; } },
+  set: (k, v) => { try { localStorage.setItem("execos:" + k, JSON.stringify(v)); } catch (e) { console.warn(e); } },
+};
+
+// ---------- CSV PARSER ----------
+function parseCsv(text) {
+  const out = [];
+  let row = [], cell = "", inQ = false, i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"' && text[i+1] === '"') { cell += '"'; i += 2; continue; }
+      if (c === '"') { inQ = false; i++; continue; }
+      cell += c; i++;
+    } else {
+      if (c === '"') { inQ = true; i++; continue; }
+      if (c === ',') { row.push(cell); cell = ""; i++; continue; }
+      if (c === '\r') { i++; continue; }
+      if (c === '\n') { row.push(cell); out.push(row); row = []; cell = ""; i++; continue; }
+      cell += c; i++;
+    }
+  }
+  if (cell.length || row.length) { row.push(cell); out.push(row); }
+  if (out.length === 0) return { headers: [], rows: [] };
+  const headers = out[0];
+  const rows = out.slice(1).map(r => {
+    const o = {};
+    headers.forEach((h, idx) => { o[h] = r[idx] || ""; });
+    return o;
+  });
+  return { headers, rows };
+}
+
+// ---------- API CALL ----------
+async function callClaude({ prompt, system = SYSTEM_PROMPT, history = [], apiKey, model }) {
+  if (!apiKey) throw new Error("No API key set. Open Settings (gear icon) and paste your Anthropic API key.");
+  const messages = [...history, { role: "user", content: prompt }];
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({ model: model || "claude-sonnet-4-6", max_tokens: 2048, system, messages }),
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error("API " + res.status + ": " + txt.slice(0, 200));
+  }
+  const data = await res.json();
+  const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("\n").trim();
+  return text || "(no response)";
+}
+
+// ---------- PRIMITIVES ----------
+const Pill = ({ children, color = T.brass, dim = false }) => (
+  <span style={{ fontFamily: FF.mono, fontSize: 10, letterSpacing: 1.2, textTransform: "uppercase", color: dim ? T.textDim : color, border: "1px solid " + (dim ? T.border : color + "44"), background: dim ? "transparent" : color + "10", padding: "2px 7px", borderRadius: 2, display: "inline-block" }}>{children}</span>
+);
+
+const Panel = ({ title, action, children, dense, accent }) => (
+  <div style={{ background: T.bgRaised, border: "1px solid " + T.border, borderTop: accent ? "2px solid " + accent : "1px solid " + T.border, borderRadius: 3, overflow: "hidden" }}>
+    {title && (
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid " + T.border, background: T.bgSunken }}>
+        <div style={{ fontFamily: FF.mono, fontSize: 10, letterSpacing: 1.8, textTransform: "uppercase", color: T.textDim }}>{title}</div>
+        {action}
+      </div>
+    )}
+    <div style={{ padding: dense ? "12px 14px" : "18px" }}>{children}</div>
+  </div>
+);
+
+const KPI = ({ label, value, sub, trend, color = T.brass }) => (
+  <div style={{ background: T.bgRaised, border: "1px solid " + T.border, borderRadius: 3, padding: "16px 16px 14px", position: "relative" }}>
+    <div style={{ position: "absolute", top: 0, left: 0, width: 3, height: "100%", background: color }} />
+    <div style={{ fontFamily: FF.mono, fontSize: 9, letterSpacing: 1.6, color: T.textDim, textTransform: "uppercase" }}>{label}</div>
+    <div style={{ fontFamily: FF.display, fontSize: 32, fontWeight: 500, color: T.text, lineHeight: 1.1, marginTop: 6, letterSpacing: -0.5 }}>{value}</div>
+    {sub && <div style={{ fontFamily: FF.mono, fontSize: 10, color: trend === "up" ? T.green : trend === "down" ? T.red : T.textDim, marginTop: 6, letterSpacing: 0.4 }}>{trend === "up" ? "▲ " : trend === "down" ? "▼ " : ""}{sub}</div>}
+  </div>
+);
+
+const Btn = ({ children, onClick, variant = "ghost", icon, loading, disabled, size = "md", full }) => {
+  const styles = {
+    primary: { background: T.brass, color: T.bg, border: "1px solid " + T.brass },
+    ghost: { background: "transparent", color: T.text, border: "1px solid " + T.border },
+    danger: { background: "transparent", color: T.red, border: "1px solid " + T.red + "44" },
+  }[variant];
+  return (
+    <button onClick={onClick} disabled={disabled || loading}
+      style={{ ...styles, fontFamily: FF.mono, fontSize: size === "sm" ? 10 : 11, letterSpacing: 1.4, textTransform: "uppercase", padding: size === "sm" ? "6px 10px" : "9px 14px", cursor: disabled || loading ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1, display: "inline-flex", alignItems: "center", gap: 7, borderRadius: 2, transition: "all 0.15s", width: full ? "100%" : "auto", justifyContent: "center" }}
+      onMouseEnter={e => { if (!disabled && variant === "ghost") e.currentTarget.style.borderColor = T.brass; }}
+      onMouseLeave={e => { if (variant === "ghost") e.currentTarget.style.borderColor = T.border; }}>
+      {loading ? <span className="spin" style={{display:"inline-flex"}}><Icon name="load" size={12} /></span> : icon && <Icon name={icon} size={12} />}
+      {children}
+    </button>
+  );
+};
+
+// ---------- TOP BAR ----------
+const TopBar = ({ onOpenPalette, onOpenSettings, hasKey }) => {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
+  const time = now.toLocaleTimeString("en-US", { hour12: false });
+  const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return (
+    <div style={{ height: 52, background: T.bgSunken, borderBottom: "1px solid " + T.border, display: "flex", alignItems: "center", padding: "0 18px", gap: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 26, height: 26, background: T.brass, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 2 }}>
+          <div style={{ fontFamily: FF.display, fontSize: 16, fontWeight: 700, color: T.bg, fontStyle: "italic" }}>E</div>
+        </div>
+        <div>
+          <div style={{ fontFamily: FF.mono, fontSize: 10, letterSpacing: 2, color: T.textDim }}>EXEC-OS</div>
+          <div style={{ fontFamily: FF.mono, fontSize: 9, letterSpacing: 1, color: T.brass, marginTop: -2 }}>v0.1 // TWINEY</div>
+        </div>
+      </div>
+      <div style={{ flex: 1 }} />
+      <button onClick={onOpenPalette} style={{ background: T.bgRaised, border: "1px solid " + T.border, color: T.textDim, fontFamily: FF.mono, fontSize: 11, padding: "7px 14px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", borderRadius: 2, minWidth: 280 }}>
+        <Icon name="search" size={12} /><span>Search or jump...</span><span style={{ flex: 1 }} /><span style={{ fontSize: 9, letterSpacing: 1.2, color: T.textFaint }}>⌘K</span>
+      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: hasKey ? T.green : T.red, boxShadow: "0 0 8px " + (hasKey ? T.green : T.red) }} />
+          <span style={{ fontFamily: FF.mono, fontSize: 10, color: T.textDim, letterSpacing: 1 }}>{hasKey ? "LIVE" : "NO KEY"}</span>
+        </div>
+        <div style={{ fontFamily: FF.mono, fontSize: 11, color: T.text, letterSpacing: 0.5, borderLeft: "1px solid " + T.border, paddingLeft: 14 }}>
+          {time}<span style={{ color: T.textFaint, marginLeft: 8 }}>{date}</span>
+        </div>
+        <button onClick={onOpenSettings} style={{ background: "transparent", border: "1px solid " + T.border, color: T.textDim, padding: 7, cursor: "pointer", borderRadius: 2, display: "flex" }}>
+          <Icon name="cog" size={14} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ---------- SIDEBAR ----------
+const Sidebar = ({ active, onChange }) => {
+  const items = [
+    { id: "dashboard", label: "Dashboard", icon: "dash" },
+    { id: "terminal", label: "Terminal", icon: "term" },
+    { id: "focus", label: "Focus OS", icon: "brain" },
+    { id: "email", label: "Email Intel", icon: "mail" },
+    { id: "reports", label: "Reports", icon: "file" },
+  ];
+  return (
+    <div style={{ width: 200, background: T.bgSunken, borderRight: "1px solid " + T.border, padding: "18px 12px", display: "flex", flexDirection: "column", gap: 2 }}>
+      <div style={{ fontFamily: FF.mono, fontSize: 9, letterSpacing: 2, color: T.textFaint, padding: "0 10px 10px", textTransform: "uppercase" }}>Modules</div>
+      {items.map(it => {
+        const isActive = active === it.id;
+        return (
+          <button key={it.id} onClick={() => onChange(it.id)}
+            style={{ background: isActive ? T.surface : "transparent", border: "none", borderLeft: isActive ? "2px solid " + T.brass : "2px solid transparent", color: isActive ? T.text : T.textDim, fontFamily: FF.body, fontSize: 13, fontWeight: isActive ? 500 : 400, padding: "10px 12px", display: "flex", alignItems: "center", gap: 11, cursor: "pointer", textAlign: "left", transition: "all 0.15s" }}
+            onMouseEnter={e => { if (!isActive) e.currentTarget.style.color = T.text; }}
+            onMouseLeave={e => { if (!isActive) e.currentTarget.style.color = T.textDim; }}>
+            <Icon name={it.icon} size={14} />{it.label}
+          </button>
+        );
+      })}
+      <div style={{ flex: 1 }} />
+      <div style={{ padding: 12, background: T.bgRaised, border: "1px solid " + T.border, borderRadius: 2, marginTop: 18 }}>
+        <div style={{ fontFamily: FF.mono, fontSize: 9, letterSpacing: 1.5, color: T.textFaint, textTransform: "uppercase", marginBottom: 6 }}>Operator</div>
+        <div style={{ fontFamily: FF.body, fontSize: 13, color: T.text, fontWeight: 500 }}>Twiney Riley Sr.</div>
+        <div style={{ fontFamily: FF.mono, fontSize: 9, color: T.brass, marginTop: 3, letterSpacing: 0.6 }}>DIR // SYSTEMS MAINT</div>
+        <div style={{ fontFamily: FF.mono, fontSize: 9, color: T.textDim, marginTop: 2 }}>CROTHALL ▸ MEDSTAR</div>
+      </div>
+    </div>
+  );
+};
+
+// ---------- TODO LIST ----------
+const TodoList = () => {
+  const [items, setItems] = useState(() => LS.get("todo_items", []));
+  const [draft, setDraft] = useState("");
+
+  const persist = (next) => { setItems(next); LS.set("todo_items", next); };
+  const add = () => {
+    const t = draft.trim();
+    if (!t) return;
+    persist([{ id: Date.now(), text: t, done: false }, ...items]);
+    setDraft("");
+  };
+  const toggle = (id) => persist(items.map(i => i.id === id ? { ...i, done: !i.done } : i));
+  const remove = (id) => persist(items.filter(i => i.id !== id));
+  const clearDone = () => persist(items.filter(i => !i.done));
+  const doneCount = items.filter(i => i.done).length;
+  const openCount = items.length - doneCount;
+
+  return (
+    <Panel title={"To-Do" + (openCount ? " — " + openCount + " open" : "")} action={
+      doneCount > 0 && (
+        <button onClick={clearDone} style={{ background: "transparent", border: "none", color: T.textDim, fontFamily: FF.mono, fontSize: 10, cursor: "pointer", letterSpacing: 1.2 }}>
+          CLEAR DONE
+        </button>
+      )
+    }>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        <input value={draft} onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") add(); }}
+          placeholder="Add a task..."
+          style={{ flex: 1, background: T.bgSunken, border: "1px solid " + T.border, color: T.text, fontFamily: FF.body, fontSize: 13, padding: "8px 12px", borderRadius: 2 }} />
+        <button onClick={add} disabled={!draft.trim()}
+          style={{ background: T.brass, border: "1px solid " + T.brass, color: T.bg, fontFamily: FF.mono, fontSize: 16, padding: "4px 14px", cursor: draft.trim() ? "pointer" : "not-allowed", opacity: draft.trim() ? 1 : 0.4, borderRadius: 2, fontWeight: 600, lineHeight: 1 }}>
+          +
+        </button>
+      </div>
+      {items.length === 0 ? (
+        <div style={{ fontFamily: FF.mono, fontSize: 10, color: T.textFaint, padding: "24px 0", textAlign: "center", letterSpacing: 1.2 }}>NO ITEMS YET</div>
+      ) : (
+        <div style={{ maxHeight: 320, overflowY: "auto" }}>
+          {items.map((item, i) => (
+            <div key={item.id}
+              style={{ display: "flex", gap: 10, padding: "9px 0", borderBottom: i < items.length - 1 ? "1px solid " + T.border : "none", alignItems: "flex-start", opacity: item.done ? 0.45 : 1 }}>
+              <button onClick={() => toggle(item.id)}
+                style={{ width: 18, height: 18, minWidth: 18, border: "1.5px solid " + (item.done ? T.green : T.borderBright), background: item.done ? T.green + "22" : "transparent", borderRadius: 2, cursor: "pointer", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1 }}>
+                {item.done && <Icon name="check" size={11} color={T.green} />}
+              </button>
+              <div style={{ flex: 1, minWidth: 0, fontFamily: FF.body, fontSize: 13, color: T.text, textDecoration: item.done ? "line-through" : "none", lineHeight: 1.4, wordBreak: "break-word" }}>
+                {item.text}
+              </div>
+              <button onClick={() => remove(item.id)}
+                style={{ background: "transparent", border: "none", color: T.textFaint, fontFamily: FF.mono, fontSize: 16, cursor: "pointer", padding: "0 4px", lineHeight: 1 }}
+                onMouseEnter={e => e.currentTarget.style.color = T.red}
+                onMouseLeave={e => e.currentTarget.style.color = T.textFaint}>
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+};
+
+// ---------- DASHBOARD ----------
+const Dashboard = ({ onJump }) => {
+  const [ssEmbed, setSsEmbed] = useState(() => LS.get("ss_embed_url", "https://priority-task-six.vercel.app"));
+  const [tasksApi, setTasksApi] = useState(() => LS.get("tasks_api_url", "https://priority-task-six.vercel.app/api/tasks"));
+  const [tasks, setTasks] = useState([]);
+  const [tasksError, setTasksError] = useState("");
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftEmbed, setDraftEmbed] = useState("");
+  const [draftTasksApi, setDraftTasksApi] = useState("");
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  useEffect(() => {
+    if (!tasksApi) { setTasks([]); setTasksError(""); return; }
+    let cancelled = false;
+    setTasksLoading(true); setTasksError("");
+    fetch(tasksApi, { cache: "no-store", credentials: "include" })
+      .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(data => {
+        if (cancelled) return;
+        const arr = Array.isArray(data) ? data : (data.tasks || data.rows || data.data || []);
+        setTasks(arr);
+      })
+      .catch(e => {
+        if (cancelled) return;
+        const msg = e.message || String(e);
+        if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+          setTasksError("CORS blocked. Your Vercel app needs a public CORS-enabled endpoint. Ask Claude for the route file.");
+        } else if (msg.includes("HTTP 401") || msg.includes("HTTP 403")) {
+          setTasksError("Endpoint requires sign-in. Need a /api/tasks/public route with no auth + CORS open.");
+        } else if (msg.includes("HTTP 404")) {
+          setTasksError("Endpoint not found at " + tasksApi + ". Check the URL or add the route.");
+        } else {
+          setTasksError(msg);
+        }
+      })
+      .finally(() => { if (!cancelled) setTasksLoading(false); });
+    return () => { cancelled = true; };
+  }, [tasksApi, refreshTick]);
+
+  const saveUrls = () => {
+    const e = draftEmbed.trim(), a = draftTasksApi.trim();
+    setSsEmbed(e); setTasksApi(a);
+    LS.set("ss_embed_url", e); LS.set("tasks_api_url", a);
+    setEditing(false);
+  };
+  const startEdit = () => { setDraftEmbed(ssEmbed); setDraftTasksApi(tasksApi); setEditing(true); };
+
+  const renderTaskRow = (row, i, total) => {
+    if (!row || typeof row !== "object") return null;
+    const keys = Object.keys(row);
+    const taskKey = keys.find(k => /^tasks?$/i.test(k)) || keys.find(k => /task|name|title|item/i.test(k)) || keys.find(k => !/^(id|row_?id)$/i.test(k)) || keys[0];
+    const taskText = ((row[taskKey] ?? "") + "").trim();
+    if (!taskText) return null;
+    const statusKey = keys.find(k => /^status$/i.test(k)) || keys.find(k => /status|state/i.test(k));
+    const ownerKey = keys.find(k => /^owner$/i.test(k)) || keys.find(k => /owner|assign|respon/i.test(k));
+    const dueKey = keys.find(k => /enddate|due|deadline/i.test(k));
+    const priorityKey = keys.find(k => /priorit/i.test(k));
+    const status = statusKey ? ((row[statusKey] ?? "") + "").trim() : "";
+    const owner = ownerKey ? ((row[ownerKey] ?? "") + "").trim() : "";
+    const due = dueKey ? ((row[dueKey] ?? "") + "").trim() : "";
+    const priority = priorityKey ? ((row[priorityKey] ?? "") + "").trim() : "";
+    const isDone = /complete|done|closed/i.test(status);
+    const isHigh = /high|urgent|critical|^1$/i.test(priority);
+    const meta = [owner, due].filter(Boolean).join(" · ");
+    return (
+      <div key={i} style={{ display: "flex", gap: 10, padding: "10px 0", borderBottom: i < total - 1 ? "1px solid " + T.border : "none", alignItems: "flex-start", opacity: isDone ? 0.45 : 1 }}>
+        <div style={{ width: 6, height: 6, minWidth: 6, borderRadius: "50%", background: isDone ? T.green : isHigh ? T.red : T.brass, marginTop: 7, flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: FF.body, fontSize: 13, color: T.text, textDecoration: isDone ? "line-through" : "none", lineHeight: 1.4, wordBreak: "break-word" }}>{taskText}</div>
+          {meta && <div style={{ fontFamily: FF.mono, fontSize: 9, color: T.textDim, marginTop: 2, letterSpacing: 0.6 }}>{meta}</div>}
+        </div>
+      </div>
+    );
+  };
+
+  const visibleTasks = tasks.filter(r => {
+    if (!r || typeof r !== "object") return false;
+    const keys = Object.keys(r);
+    const statusKey = keys.find(k => /status|state/i.test(k));
+    if (!statusKey) return true;
+    return !/complete|done|closed/i.test(((r[statusKey] ?? "") + ""));
+  }).slice(0, 12);
+
+  return (
+    <div style={{ padding: 22, display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ fontFamily: FF.mono, fontSize: 10, letterSpacing: 2.4, color: T.brass, textTransform: "uppercase" }}>Executive Dashboard</div>
+          <h1 style={{ fontFamily: FF.display, fontSize: 36, fontWeight: 500, color: T.text, margin: "6px 0 0", letterSpacing: -0.8, fontStyle: "italic" }}>Good morning, Twiney.</h1>
+        </div>
+        <Btn icon="spark" variant="primary" onClick={() => onJump("terminal")}>Brief Me</Btn>
+      </div>
+
+      <Panel title="Priority Tasks — Live Tracker" accent={T.cyan} action={
+        <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+          {ssEmbed && !editing && (
+            <a href={ssEmbed} target="_blank" rel="noopener noreferrer" style={{ color: T.cyan, fontFamily: FF.mono, fontSize: 10, letterSpacing: 1.2, textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
+              OPEN <Icon name="arrow" size={10} />
+            </a>
+          )}
+          {!editing && (
+            <button onClick={startEdit} style={{ background: "transparent", border: "none", color: T.textDim, fontFamily: FF.mono, fontSize: 10, cursor: "pointer", letterSpacing: 1.2 }}>
+              CHANGE
+            </button>
+          )}
+        </div>
+      }>
+        {editing ? (
+          <div>
+            <div style={{ fontFamily: FF.mono, fontSize: 10, letterSpacing: 1.4, color: T.textDim, textTransform: "uppercase", marginBottom: 6 }}>Embed URL (iframe view)</div>
+            <input value={draftEmbed} onChange={e => setDraftEmbed(e.target.value)} placeholder="https://priority-task-six.vercel.app"
+              style={{ width: "100%", background: T.bgSunken, border: "1px solid " + T.border, color: T.text, fontFamily: FF.mono, fontSize: 12, padding: "10px 12px", borderRadius: 2 }} />
+            <div style={{ fontFamily: FF.mono, fontSize: 10, letterSpacing: 1.4, color: T.textDim, textTransform: "uppercase", marginTop: 14, marginBottom: 6 }}>Tasks API URL (JSON endpoint)</div>
+            <input value={draftTasksApi} onChange={e => setDraftTasksApi(e.target.value)} placeholder="https://priority-task-six.vercel.app/api/tasks"
+              style={{ width: "100%", background: T.bgSunken, border: "1px solid " + T.border, color: T.text, fontFamily: FF.mono, fontSize: 12, padding: "10px 12px", borderRadius: 2 }} />
+            <div style={{ fontFamily: FF.body, fontSize: 11, color: T.textFaint, marginTop: 10, lineHeight: 1.5 }}>
+              The Tasks API must allow cross-origin reads (CORS) and be accessible without auth. If yours requires sign-in, ask Claude for the public route file.
+            </div>
+            <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <Btn onClick={() => setEditing(false)} size="sm">Cancel</Btn>
+              <Btn variant="primary" icon="check" onClick={saveUrls} size="sm">Save</Btn>
+            </div>
+          </div>
+        ) : ssEmbed ? (
+          !/app\.smartsheet\.com/i.test(ssEmbed) ? (
+            <iframe src={ssEmbed} style={{ width: "100%", height: 540, border: "none", background: T.bgSunken, borderRadius: 2, display: "block" }} title="Priority Tasks Tracker" />
+          ) : (
+            <div style={{ padding: "8px 4px" }}>
+              <a href={ssEmbed} target="_blank" rel="noopener noreferrer"
+                style={{ display: "flex", alignItems: "center", gap: 16, padding: "20px 16px", textDecoration: "none", color: "inherit", cursor: "pointer", background: T.bgSunken, border: "1px solid " + T.cyan + "33", borderRadius: 3 }}>
+                <div style={{ width: 52, height: 52, background: T.cyan + "15", border: "1px solid " + T.cyan + "55", borderRadius: 3, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Icon name="file" size={22} color={T.cyan} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: FF.display, fontSize: 18, fontWeight: 500, color: T.text, letterSpacing: -0.3, fontStyle: "italic" }}>Open Sheet in Smartsheet</div>
+                  <div style={{ fontFamily: FF.mono, fontSize: 10, color: T.textDim, marginTop: 4, letterSpacing: 0.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ssEmbed}</div>
+                </div>
+                <div style={{ fontFamily: FF.mono, fontSize: 10, color: T.cyan, letterSpacing: 1.4, display: "flex", alignItems: "center", gap: 6 }}>OPEN <Icon name="arrow" size={11} /></div>
+              </a>
+              <div style={{ fontFamily: FF.body, fontSize: 12, color: T.amber, marginTop: 12, padding: "10px 14px", background: T.amber + "10", border: "1px solid " + T.amber + "33", borderRadius: 2, lineHeight: 1.5 }}>
+                This is the Smartsheet editor URL. Paste https://priority-task-six.vercel.app to embed your existing tracker instead.
+              </div>
+            </div>
+          )
+        ) : (
+          <div style={{ padding: "44px 4px", textAlign: "center" }}>
+            <div style={{ display: "inline-flex" }}><Icon name="file" size={32} color={T.textDim} /></div>
+            <div style={{ fontFamily: FF.display, fontSize: 18, color: T.text, marginTop: 12, fontStyle: "italic" }}>No tracker connected</div>
+            <Btn variant="primary" onClick={startEdit} icon="key">Set up Tracker</Btn>
+          </div>
+        )}
+      </Panel>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+        <Panel title={"Sheet Tasks" + (visibleTasks.length ? " — " + visibleTasks.length : "")} action={
+          tasksApi && (
+            <button onClick={() => setRefreshTick(x => x + 1)} style={{ background: "transparent", border: "none", color: T.textDim, fontFamily: FF.mono, fontSize: 10, cursor: "pointer", letterSpacing: 1.2 }}>
+              REFRESH
+            </button>
+          )
+        }>
+          {tasksLoading ? (
+            <div style={{ color: T.cyan, fontFamily: FF.mono, fontSize: 11, display: "flex", alignItems: "center", gap: 8, padding: "30px 0", justifyContent: "center" }}>
+              <span className="spin" style={{display:"inline-flex"}}><Icon name="load" size={12} /></span>LOADING...
+            </div>
+          ) : tasksError ? (
+            <div style={{ fontFamily: FF.body, fontSize: 12, color: T.amber, lineHeight: 1.6, padding: "12px 4px" }}>{tasksError}</div>
+          ) : !tasksApi ? (
+            <div style={{ fontFamily: FF.body, fontSize: 12.5, color: T.textDim, padding: "20px 4px", lineHeight: 1.6 }}>
+              Set a Tasks API URL via CHANGE above.
+            </div>
+          ) : visibleTasks.length === 0 ? (
+            <div style={{ fontFamily: FF.mono, fontSize: 11, color: T.textFaint, padding: "30px 0", textAlign: "center", letterSpacing: 1 }}>NO OPEN TASKS</div>
+          ) : (
+            <div style={{ maxHeight: 320, overflowY: "auto" }}>
+              {visibleTasks.map((row, i) => renderTaskRow(row, i, visibleTasks.length))}
+            </div>
+          )}
+        </Panel>
+        <TodoList />
+        <Panel title="Today">
+          {[
+            { t:"09:00", e:"MWHC walkthrough — Paul (Bay Eng)", c:T.brass },
+            { t:"11:30", e:"Heather 1:1 — Turnover v2 review", c:T.cyan },
+            { t:"14:00", e:"Limbach — Building X commissioning sync", c:T.brass },
+            { t:"16:00", e:"Chris Castle — Vendor SLA briefing", c:T.amber },
+          ].map((m, i) => (
+            <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: i < 3 ? 12 : 0 }}>
+              <div style={{ fontFamily: FF.mono, fontSize: 11, color: m.c, letterSpacing: 0.6, minWidth: 42 }}>{m.t}</div>
+              <div style={{ fontFamily: FF.body, fontSize: 12, color: T.text, lineHeight: 1.5 }}>{m.e}</div>
+            </div>
+          ))}
+        </Panel>
+      </div>
+    </div>
+  );
+};
+
+// ---------- TERMINAL ----------
+const TerminalView = ({ apiKey, model }) => {
+  const [messages, setMessages] = useState(() => LS.get("terminal_messages", []));
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    LS.set("terminal_messages", messages.slice(-40));
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
+
+  const send = useCallback(async (text) => {
+    const prompt = (text ?? input).trim();
+    if (!prompt || loading) return;
+    setInput("");
+    const next = [...messages, { role: "user", content: prompt, ts: Date.now() }];
+    setMessages(next);
+    setLoading(true);
+    try {
+      const history = next.slice(-10).filter(m => m.role !== "system").map(m => ({ role: m.role, content: m.content })).slice(0, -1);
+      const reply = await callClaude({ prompt, history, apiKey, model });
+      setMessages(prev => [...prev, { role: "assistant", content: reply, ts: Date.now() }]);
+    } catch (e) {
+      setMessages(prev => [...prev, { role: "system", content: e.message, ts: Date.now() }]);
+    } finally {
+      setLoading(false);
+    }
+  }, [input, loading, messages, apiKey, model]);
+
+  const clear = () => { setMessages([]); LS.set("terminal_messages", []); };
+
+  const quickCmds = [
+    "Brief me on today's priorities",
+    "Draft a vendor escalation to Siemens about the SSO e-signature dispute",
+    "Summarize the MGUH AHU-6 issue for Chris Castle",
+    "Build me an executive outage report template",
+    "Compare PM completion across the 10 hospitals — what's the pattern?",
+    "Identify bottlenecks in the MWHC turnover checklist rollout",
+  ];
+
+  return (
+    <div style={{ padding: 22, height: "100%", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ fontFamily: FF.mono, fontSize: 10, letterSpacing: 2.4, color: T.brass, textTransform: "uppercase" }}>AI Command Terminal</div>
+          <h1 style={{ fontFamily: FF.display, fontSize: 28, fontWeight: 500, color: T.text, margin: "4px 0 0", fontStyle: "italic", letterSpacing: -0.5 }}>Natural language → executive output.</h1>
+        </div>
+        <Btn icon="trash" onClick={clear} size="sm">Clear</Btn>
+      </div>
+      <div ref={scrollRef} style={{ flex: 1, background: T.bgSunken, border: "1px solid " + T.border, borderRadius: 3, padding: 18, overflowY: "auto", minHeight: 0, fontFamily: FF.mono, fontSize: 13, lineHeight: 1.65, color: T.text }}>
+        {messages.length === 0 && (
+          <div>
+            <div style={{ color: T.brass, marginBottom: 14 }}>EXEC-OS // session initialized</div>
+            <div style={{ color: T.textDim, fontSize: 12, marginBottom: 18 }}>Type any executive request. Or tap a quick start below.</div>
+            <div style={{ color: T.textFaint, fontSize: 11, marginBottom: 8 }}>QUICK START</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {quickCmds.map((c, i) => (
+                <button key={i} onClick={() => send(c)}
+                  style={{ background: T.bgRaised, border: "1px solid " + T.border, color: T.text, fontFamily: FF.body, fontSize: 12, padding: "10px 14px", cursor: "pointer", borderRadius: 2, textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = T.brass}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = T.border}>
+                  <Icon name="arrow" size={12} color={T.brass} />{c}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {messages.map((m, i) => (
+          <div key={i} style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 10, letterSpacing: 1.6, color: m.role === "user" ? T.brass : m.role === "system" ? T.red : T.cyan, marginBottom: 6 }}>
+              {m.role === "user" ? "▸ TWINEY" : m.role === "system" ? "✕ SYSTEM" : "◉ EXEC-OS"}
+              <span style={{ color: T.textFaint, marginLeft: 10, fontSize: 9 }}>{new Date(m.ts).toLocaleTimeString("en-US", { hour12: false })}</span>
+            </div>
+            <div style={{ whiteSpace: "pre-wrap", color: m.role === "system" ? T.red : T.text, fontFamily: m.role === "assistant" ? FF.body : FF.mono, fontSize: m.role === "assistant" ? 14 : 13, lineHeight: 1.6, paddingLeft: 14, borderLeft: "1px solid " + T.border }}>{m.content}</div>
+            {m.role === "assistant" && (
+              <div style={{ display: "flex", gap: 6, marginTop: 8, paddingLeft: 14 }}>
+                <button onClick={() => navigator.clipboard?.writeText(m.content)} style={{ background: "transparent", border: "1px solid " + T.border, color: T.textDim, fontFamily: FF.mono, fontSize: 9, padding: "4px 8px", cursor: "pointer", borderRadius: 2, letterSpacing: 1, display: "flex", alignItems: "center", gap: 4 }}>
+                  <Icon name="copy" size={10} /> COPY
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+        {loading && (
+          <div style={{ color: T.cyan, display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="spin" style={{display:"inline-flex"}}><Icon name="load" size={12} /></span>
+            <span style={{ fontSize: 11, letterSpacing: 1.2 }}>EXEC-OS thinking...</span>
+          </div>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 8, background: T.bgRaised, border: "1px solid " + T.borderBright, borderRadius: 3, padding: 4 }}>
+        <div style={{ color: T.brass, fontFamily: FF.mono, padding: "12px 4px 12px 14px", fontSize: 14 }}>▸</div>
+        <input value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+          placeholder="Tell EXEC-OS what you need..."
+          style={{ flex: 1, background: "transparent", border: "none", color: T.text, fontFamily: FF.mono, fontSize: 13, padding: "12px 0" }} />
+        <Btn icon="send" variant="primary" onClick={() => send()} loading={loading}>Execute</Btn>
+      </div>
+    </div>
+  );
+};
+
+// ---------- FOCUS OS ----------
+const FOCUS_MODULES = [
+  { id:"shatter", name:"Task Paralysis Shatterer", icon:"hex", color:T.brass, blurb:"Break any frozen task into sub-1-minute steps. Get the exact first physical action.", input:"Task you're staring at",
+    prompt: v => `I'm staring at this task and cannot start: "${v}". Break it into ridiculously small steps, each under 1 minute. Then tell me the EXACT first physical action I should take in the next 30 seconds. No motivational language. Just the steps and the action.` },
+  { id:"dopamine", name:"Dopamine Menu", icon:"flame", color:T.red, blurb:"Under-stimulated and drifting? Get a structured menu of micro-engagements.", input:"What kind of work or mood?",
+    prompt: v => `Context: ${v}. I'm under-stimulated and disengaged. Build me a dopamine menu with three sections: 5-MINUTE APPETIZERS (quick wins), 20-MINUTE ENTREES (real progress), 10-MINUTE SIDES (low-effort momentum). 3 items per section. Each item one line.` },
+  { id:"double", name:"Body Double", icon:"target", color:T.cyan, blurb:"30-minute focus partner with check-ins. Acts as the presence that keeps you on task.", input:"What are you working on?",
+    prompt: v => `Act as my body double for a 30-minute focus block. I'm working on: "${v}". Give me: (1) a one-sentence intention to lock in, (2) the first 5-minute starter action, (3) what I should aim to have done by minute 15, (4) what done looks like at minute 30. Be present and direct, not motivational.` },
+  { id:"switch", name:"Context Switch", icon:"arrow", color:T.amber, blurb:"3-minute transition routine between tasks. Closes one loop and opens the next.", input:"From [Task A] → to [Task B]",
+    prompt: v => `I just finished one task and need to switch to another. Context: ${v}. Build a 3-minute transition routine: (1) 60-second close-out of the previous task, (2) 60-second physical/mental reset, (3) 60-second re-entry into the new task with the first concrete step. Specific actions only.` },
+  { id:"gamify", name:"Quest Mode", icon:"tri", color:T.brass, blurb:"Gamify a boring task using something you're actually into right now.", input:"Boring task + current interest",
+    prompt: v => `Gamify this for me. Input: ${v}. Frame the boring task as a quest using the lens of my current interest. Give me: QUEST NAME, OBJECTIVE, 3 milestones (each with XP value), 1 boss fight, and the reward at completion. Make it sharp, not corny.` },
+  { id:"dump", name:"Open Loop Dump", icon:"list", color:T.green, blurb:"Brain full? Dump everything. AI sorts into NOW / LATER / TRASH with one next step.", input:"Dump everything in your head",
+    prompt: v => `My brain is full. Here is everything: ${v}. Categorize each item into NOW (today), LATER (this week or later), or TRASH (delete from my head). Then give me ONE actionable next step to do in the next 10 minutes. Be ruthless about TRASH.` },
+];
+
+const FocusModuleRunner = ({ module, onBack, bd, apiKey, model }) => {
+  const [input, setInput] = useState("");
+  const [output, setOutput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState(() => LS.get("focus_" + module.id + "_history", []));
+
+  const run = async () => {
+    if (!input.trim() || loading) return;
+    setLoading(true); setOutput("");
+    try {
+      const reply = await callClaude({ prompt: module.prompt(input), apiKey, model });
+      setOutput(reply);
+      const newHist = [{ input, output: reply, ts: Date.now() }, ...history].slice(0, 10);
+      setHistory(newHist);
+      LS.set("focus_" + module.id + "_history", newHist);
+      if (module.id === "double") { bd.reset(); bd.setActive(true); }
+    } catch (e) { setOutput("Error: " + e.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div style={{ padding: 22 }}>
+      <button onClick={onBack} style={{ background: "transparent", border: "none", color: T.textDim, fontFamily: FF.mono, fontSize: 10, letterSpacing: 1.6, cursor: "pointer", padding: 0, marginBottom: 16, display: "flex", alignItems: "center", gap: 6 }}>← BACK TO FOCUS OS</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+        <div style={{ width: 48, height: 48, background: module.color + "18", border: "1px solid " + module.color + "55", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 3 }}>
+          <Icon name={module.icon} size={22} color={module.color} />
+        </div>
+        <div>
+          <h1 style={{ fontFamily: FF.display, fontSize: 26, fontWeight: 500, color: T.text, margin: 0, letterSpacing: -0.4, fontStyle: "italic" }}>{module.name}</h1>
+          <div style={{ fontFamily: FF.body, fontSize: 13, color: T.textDim, marginTop: 2 }}>{module.blurb}</div>
+        </div>
+      </div>
+      {module.id === "double" && bd.active && (
+        <div style={{ background: T.cyan + "10", border: "1px solid " + T.cyan + "55", padding: 18, borderRadius: 3, marginBottom: 16, display: "flex", alignItems: "center", gap: 18 }}>
+          <Icon name="timer" size={20} color={T.cyan} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: FF.mono, fontSize: 10, color: T.cyan, letterSpacing: 1.6 }}>BODY DOUBLE ACTIVE</div>
+            <div style={{ fontFamily: FF.display, fontSize: 32, fontWeight: 500, color: T.text, letterSpacing: -1 }}>
+              {String(Math.floor(bd.seconds / 60)).padStart(2, "0")}:{String(bd.seconds % 60).padStart(2, "0")}
+            </div>
+          </div>
+          <Btn icon="pause" onClick={() => bd.setActive(false)}>Pause</Btn>
+        </div>
+      )}
+      <Panel title={module.input}>
+        <textarea value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run(); }}
+          placeholder="Type here. Cmd/Ctrl+Enter to run." rows={4}
+          style={{ width: "100%", background: T.bgSunken, border: "1px solid " + T.border, color: T.text, fontFamily: FF.body, fontSize: 14, padding: 14, borderRadius: 2, resize: "vertical" }} />
+        <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+          <Btn icon="zap" variant="primary" onClick={run} loading={loading}>Execute</Btn>
+        </div>
+      </Panel>
+      {output && (
+        <div style={{ marginTop: 14 }}>
+          <Panel title="Output" accent={module.color}>
+            <div style={{ fontFamily: FF.body, fontSize: 14, color: T.text, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{output}</div>
+            <div style={{ marginTop: 14 }}>
+              <Btn icon="copy" onClick={() => navigator.clipboard?.writeText(output)} size="sm">Copy</Btn>
+            </div>
+          </Panel>
+        </div>
+      )}
+      {history.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <Panel title={"History — " + module.name}>
+            {history.map((h, i) => (
+              <div key={i} style={{ padding: "10px 0", borderBottom: i < history.length - 1 ? "1px solid " + T.border : "none", cursor: "pointer" }}
+                onClick={() => { setInput(h.input); setOutput(h.output); }}>
+                <div style={{ fontFamily: FF.mono, fontSize: 9, color: T.textFaint, letterSpacing: 1 }}>{new Date(h.ts).toLocaleString()}</div>
+                <div style={{ fontFamily: FF.body, fontSize: 12.5, color: T.text, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.input}</div>
+              </div>
+            ))}
+          </Panel>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const FocusOS = ({ apiKey, model }) => {
+  const [active, setActive] = useState(null);
+  const [bdActive, setBdActive] = useState(false);
+  const [bdSeconds, setBdSeconds] = useState(30 * 60);
+  useEffect(() => {
+    if (!bdActive) return;
+    const t = setInterval(() => setBdSeconds(s => { if (s <= 1) { setBdActive(false); return 0; } return s - 1; }), 1000);
+    return () => clearInterval(t);
+  }, [bdActive]);
+  const bd = { active: bdActive, seconds: bdSeconds, setActive: setBdActive, reset: () => setBdSeconds(30 * 60) };
+
+  if (active) return <FocusModuleRunner module={active} onBack={() => setActive(null)} bd={bd} apiKey={apiKey} model={model} />;
+
+  return (
+    <div style={{ padding: 22 }}>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontFamily: FF.mono, fontSize: 10, letterSpacing: 2.4, color: T.brass, textTransform: "uppercase" }}>Performance / Focus OS</div>
+        <h1 style={{ fontFamily: FF.display, fontSize: 28, fontWeight: 500, color: T.text, margin: "4px 0 0", fontStyle: "italic", letterSpacing: -0.5 }}>Six tools for when execution stalls.</h1>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+        {FOCUS_MODULES.map(m => (
+          <button key={m.id} onClick={() => setActive(m)}
+            style={{ background: T.bgRaised, border: "1px solid " + T.border, borderRadius: 3, padding: 20, textAlign: "left", cursor: "pointer", transition: "all 0.2s", display: "flex", flexDirection: "column", gap: 12 }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = m.color; e.currentTarget.style.transform = "translateY(-2px)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.transform = "translateY(0)"; }}>
+            <div style={{ width: 36, height: 36, background: m.color + "18", border: "1px solid " + m.color + "44", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 2 }}>
+              <Icon name={m.icon} size={16} color={m.color} />
+            </div>
+            <div>
+              <div style={{ fontFamily: FF.display, fontSize: 18, fontWeight: 500, color: T.text, letterSpacing: -0.3 }}>{m.name}</div>
+              <div style={{ fontFamily: FF.body, fontSize: 12.5, color: T.textDim, marginTop: 6, lineHeight: 1.5 }}>{m.blurb}</div>
+            </div>
+            <div style={{ fontFamily: FF.mono, fontSize: 10, color: m.color, letterSpacing: 1.4, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>LAUNCH <Icon name="arrow" size={11} /></div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ---------- EMAIL ----------
+const EmailView = ({ apiKey, model }) => {
+  const [emailText, setEmailText] = useState("");
+  const [output, setOutput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [activeAction, setActiveAction] = useState("");
+  const actions = [
+    { id:"summarize", label:"Summarize", icon:"file", prompt: e => `Summarize this email thread for an executive. 3 lines max. Then list any commitments, blockers, and unanswered questions.\n\n---\n${e}` },
+    { id:"draft", label:"Draft Reply", icon:"send", prompt: e => `Draft a professional reply to this email in Twiney's voice — direct, executive-appropriate, plain prose. No bullets unless content requires them.\n\n---\n${e}` },
+    { id:"firm", label:"Firm Reply", icon:"tri", prompt: e => `Draft a firm but professional reply. Hold the line, request what's needed in writing, no softening. Twiney's voice.\n\n---\n${e}` },
+    { id:"escalate", label:"Escalate", icon:"alert", prompt: e => `Draft an escalation message to leadership about the issue in this email. Open with the operational risk, then 2-3 sentences of context, then the specific decision or support needed. Twiney's voice.\n\n---\n${e}` },
+    { id:"actions", label:"Action List", icon:"list", prompt: e => `Convert this email into a numbered action list. Each action: owner, action, due date if stated. End with one line on any blockers.\n\n---\n${e}` },
+    { id:"commitments", label:"Commitments", icon:"check", prompt: e => `Extract every commitment made in this email thread — by whom, what, by when. Then flag any that look at risk.\n\n---\n${e}` },
+  ];
+  const run = async (a) => {
+    if (!emailText.trim() || loading) return;
+    setActiveAction(a.id); setLoading(true); setOutput("");
+    try { setOutput(await callClaude({ prompt: a.prompt(emailText), apiKey, model })); }
+    catch (e) { setOutput("Error: " + e.message); }
+    finally { setLoading(false); }
+  };
+  return (
+    <div style={{ padding: 22 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontFamily: FF.mono, fontSize: 10, letterSpacing: 2.4, color: T.brass, textTransform: "uppercase" }}>Email Intelligence</div>
+        <h1 style={{ fontFamily: FF.display, fontSize: 28, fontWeight: 500, color: T.text, margin: "4px 0 0", fontStyle: "italic", letterSpacing: -0.5 }}>Paste any thread. Get executive-ready output.</h1>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <Panel title="Source Email">
+          <textarea value={emailText} onChange={e => setEmailText(e.target.value)} placeholder="Paste an email thread, forwarded chain, or pasted transcription..." rows={14}
+            style={{ width: "100%", background: T.bgSunken, border: "1px solid " + T.border, color: T.text, fontFamily: FF.mono, fontSize: 12, padding: 14, borderRadius: 2, resize: "vertical", lineHeight: 1.6 }} />
+          <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+            {actions.map(a => (
+              <Btn key={a.id} icon={a.icon} onClick={() => run(a)} disabled={!emailText.trim()} loading={loading && activeAction === a.id} full>{a.label}</Btn>
+            ))}
+          </div>
+        </Panel>
+        <Panel title="Output" accent={T.brass} action={output && (
+          <button onClick={() => navigator.clipboard?.writeText(output)} style={{ background: "transparent", border: "none", color: T.brass, fontFamily: FF.mono, fontSize: 10, cursor: "pointer", letterSpacing: 1.2 }}>COPY</button>
+        )}>
+          {loading ? (
+            <div style={{ color: T.cyan, fontFamily: FF.mono, fontSize: 12, display: "flex", alignItems: "center", gap: 8, padding: "40px 0", justifyContent: "center" }}>
+              <span className="spin" style={{display:"inline-flex"}}><Icon name="load" size={14} /></span>Processing...
+            </div>
+          ) : output ? (
+            <div style={{ fontFamily: FF.body, fontSize: 14, color: T.text, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{output}</div>
+          ) : (
+            <div style={{ color: T.textFaint, fontFamily: FF.mono, fontSize: 11, textAlign: "center", padding: "40px 0", letterSpacing: 1 }}>PASTE EMAIL + PICK AN ACTION</div>
+          )}
+        </Panel>
+      </div>
+    </div>
+  );
+};
+
+// ---------- REPORTS ----------
+const ReportsView = ({ apiKey, model }) => {
+  const [type, setType] = useState("outage");
+  const [context, setContext] = useState("");
+  const [output, setOutput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(() => LS.get("saved_reports", []));
+  const templates = {
+    outage: { name:"Outage Report", sections:["Executive Summary","Timeline","Impact","Root Cause","Corrective Actions","Owner"] },
+    incident: { name:"Incident Report", sections:["Incident Summary","Sequence of Events","Affected Systems","Response","Lessons Learned"] },
+    rca: { name:"Root Cause Analysis", sections:["Problem Statement","Investigation Method","Findings","Root Cause","Corrective Actions"] },
+    pm: { name:"PM Compliance Report", sections:["Period","Site Breakdown","Variance Analysis","Exceptions","Recommendations"] },
+    vendor: { name:"Vendor Performance", sections:["Vendor","Scope","Performance vs SLA","Issues","Recommendation"] },
+    weekly: { name:"Weekly Executive Summary", sections:["This Week","Wins","Risks & Blockers","Next Week","Decisions Needed"] },
+  };
+  const generate = async () => {
+    if (!context.trim() || loading) return;
+    setLoading(true); setOutput("");
+    const tmpl = templates[type];
+    const prompt = `Generate a polished executive ${tmpl.name} for Twiney's MedStar portfolio. Use these sections in this order:\n\n${tmpl.sections.map((s, i) => (i + 1) + ". " + s).join("\n")}\n\nCONTEXT FROM TWINEY:\n${context}\n\nWrite in plain executive prose. Each section gets a short header in CAPS followed by the body. No bullets unless the data demands a list. Be concrete. If you don't have specifics, leave a clearly marked [TBD: specific item] placeholder rather than fabricating.`;
+    try { setOutput(await callClaude({ prompt, apiKey, model })); }
+    catch (e) { setOutput("Error: " + e.message); }
+    finally { setLoading(false); }
+  };
+  const save = () => {
+    if (!output) return;
+    const item = { id: Date.now(), type, name: templates[type].name, context: context.slice(0, 100), output, ts: Date.now() };
+    const next = [item, ...saved].slice(0, 20);
+    setSaved(next); LS.set("saved_reports", next);
+  };
+  return (
+    <div style={{ padding: 22 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontFamily: FF.mono, fontSize: 10, letterSpacing: 2.4, color: T.brass, textTransform: "uppercase" }}>Executive Report Drafter</div>
+        <h1 style={{ fontFamily: FF.display, fontSize: 28, fontWeight: 500, color: T.text, margin: "4px 0 0", fontStyle: "italic", letterSpacing: -0.5 }}>From context to leadership-ready in under a minute.</h1>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Panel title="Report Type">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {Object.entries(templates).map(([k, v]) => (
+                <button key={k} onClick={() => setType(k)}
+                  style={{ background: type === k ? T.brass + "15" : T.bgSunken, border: "1px solid " + (type === k ? T.brass : T.border), color: type === k ? T.brass : T.text, fontFamily: FF.body, fontSize: 12, padding: "10px 12px", cursor: "pointer", borderRadius: 2, textAlign: "left", fontWeight: type === k ? 500 : 400 }}>
+                  {v.name}
+                </button>
+              ))}
+            </div>
+            <div style={{ marginTop: 14, fontFamily: FF.mono, fontSize: 9, color: T.textFaint, letterSpacing: 1.2 }}>SECTIONS</div>
+            <div style={{ marginTop: 6, fontFamily: FF.body, fontSize: 12, color: T.textDim, lineHeight: 1.7 }}>{templates[type].sections.join(" · ")}</div>
+          </Panel>
+          <Panel title="Context">
+            <textarea value={context} onChange={e => setContext(e.target.value)} placeholder="Drop in raw notes, dates, names, vendor mentions, what happened, who's involved. EXEC-OS will structure it." rows={8}
+              style={{ width: "100%", background: T.bgSunken, border: "1px solid " + T.border, color: T.text, fontFamily: FF.body, fontSize: 13, padding: 14, borderRadius: 2, resize: "vertical", lineHeight: 1.6 }} />
+            <div style={{ marginTop: 12 }}>
+              <Btn icon="spark" variant="primary" onClick={generate} loading={loading} full>Generate {templates[type].name}</Btn>
+            </div>
+          </Panel>
+          {saved.length > 0 && (
+            <Panel title={"Saved Reports — " + saved.length}>
+              <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                {saved.map(s => (
+                  <div key={s.id} onClick={() => { setType(s.type); setContext(s.context); setOutput(s.output); }}
+                    style={{ padding: "8px 0", borderBottom: "1px solid " + T.border, cursor: "pointer" }}>
+                    <div style={{ fontFamily: FF.body, fontSize: 12, color: T.text }}>{s.name}</div>
+                    <div style={{ fontFamily: FF.mono, fontSize: 9, color: T.textFaint, marginTop: 2 }}>{new Date(s.ts).toLocaleString()}</div>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          )}
+        </div>
+        <Panel title="Draft" accent={T.brass} action={output && (
+          <div style={{ display: "flex", gap: 12 }}>
+            <button onClick={() => navigator.clipboard?.writeText(output)} style={{ background: "transparent", border: "none", color: T.brass, fontFamily: FF.mono, fontSize: 10, cursor: "pointer", letterSpacing: 1.2 }}>COPY</button>
+            <button onClick={save} style={{ background: "transparent", border: "none", color: T.brass, fontFamily: FF.mono, fontSize: 10, cursor: "pointer", letterSpacing: 1.2 }}>SAVE</button>
+          </div>
+        )}>
+          {loading ? (
+            <div style={{ color: T.cyan, fontFamily: FF.mono, fontSize: 12, display: "flex", alignItems: "center", gap: 8, padding: "60px 0", justifyContent: "center" }}>
+              <span className="spin" style={{display:"inline-flex"}}><Icon name="load" size={14} /></span>Drafting {templates[type].name}...
+            </div>
+          ) : output ? (
+            <div style={{ fontFamily: FF.body, fontSize: 14, color: T.text, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>{output}</div>
+          ) : (
+            <div style={{ color: T.textFaint, fontFamily: FF.mono, fontSize: 11, textAlign: "center", padding: "80px 0", letterSpacing: 1 }}>SELECT TYPE + ADD CONTEXT + GENERATE</div>
+          )}
+        </Panel>
+      </div>
+    </div>
+  );
+};
+
+// ---------- SETTINGS MODAL ----------
+const Settings = ({ open, onClose, apiKey, setApiKey, model, setModel }) => {
+  const [draft, setDraft] = useState(apiKey || "");
+  useEffect(() => { setDraft(apiKey || ""); }, [apiKey, open]);
+  if (!open) return null;
+  const save = () => { setApiKey(draft.trim()); LS.set("api_key", draft.trim()); onClose(); };
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: 560, background: T.bgRaised, border: "1px solid " + T.borderBright, borderRadius: 4, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid " + T.border, background: T.bgSunken, display: "flex", alignItems: "center", gap: 10 }}>
+          <Icon name="cog" size={16} color={T.brass} />
+          <div style={{ fontFamily: FF.mono, fontSize: 11, letterSpacing: 2, color: T.text, textTransform: "uppercase" }}>Settings</div>
+        </div>
+        <div style={{ padding: 22 }}>
+          <div style={{ fontFamily: FF.mono, fontSize: 10, letterSpacing: 1.4, color: T.textDim, textTransform: "uppercase", marginBottom: 8 }}>Anthropic API Key</div>
+          <input type="password" value={draft} onChange={e => setDraft(e.target.value)} placeholder="sk-ant-..."
+            style={{ width: "100%", background: T.bgSunken, border: "1px solid " + T.border, color: T.text, fontFamily: FF.mono, fontSize: 12, padding: "10px 12px", borderRadius: 2 }} />
+          <div style={{ fontFamily: FF.body, fontSize: 11, color: T.textFaint, marginTop: 8, lineHeight: 1.5 }}>
+            Stored only in this browser's localStorage. Never sent anywhere except api.anthropic.com. Get yours at console.anthropic.com.
+          </div>
+          <div style={{ marginTop: 20, fontFamily: FF.mono, fontSize: 10, letterSpacing: 1.4, color: T.textDim, textTransform: "uppercase", marginBottom: 8 }}>Model</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+            {[
+              { id: "claude-sonnet-4-6", label: "Sonnet 4.6" },
+              { id: "claude-opus-4-7", label: "Opus 4.7" },
+              { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
+            ].map(m => (
+              <button key={m.id} onClick={() => { setModel(m.id); LS.set("model", m.id); }}
+                style={{ background: model === m.id ? T.brass + "15" : T.bgSunken, border: "1px solid " + (model === m.id ? T.brass : T.border), color: model === m.id ? T.brass : T.text, fontFamily: FF.mono, fontSize: 10, padding: "8px", cursor: "pointer", borderRadius: 2, letterSpacing: 1 }}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontFamily: FF.body, fontSize: 11, color: T.textFaint, marginTop: 8, lineHeight: 1.5 }}>
+            If a model name is rejected, check console.anthropic.com for the current model IDs and update this file.
+          </div>
+          <div style={{ marginTop: 24, display: "flex", justifyContent: "space-between", gap: 8 }}>
+            <Btn variant="danger" icon="trash" onClick={() => {
+              if (confirm("Clear ALL local data (key, history, saved reports)?")) {
+                Object.keys(localStorage).filter(k => k.startsWith("execos:")).forEach(k => localStorage.removeItem(k));
+                location.reload();
+              }
+            }}>Wipe local data</Btn>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Btn onClick={onClose}>Cancel</Btn>
+              <Btn variant="primary" icon="key" onClick={save}>Save</Btn>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------- COMMAND PALETTE ----------
+const Palette = ({ open, onClose, onJump }) => {
+  const [q, setQ] = useState("");
+  useEffect(() => { if (open) setQ(""); }, [open]);
+  const items = [
+    { id: "dashboard", label: "Go to Dashboard", icon: "dash" },
+    { id: "terminal", label: "Open AI Terminal", icon: "term" },
+    { id: "focus", label: "Open Focus OS", icon: "brain" },
+    { id: "email", label: "Email Intelligence", icon: "mail" },
+    { id: "reports", label: "Report Drafter", icon: "file" },
+  ];
+  const filtered = q ? items.filter(i => i.label.toLowerCase().includes(q.toLowerCase())) : items;
+  if (!open) return null;
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: 120 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: 520, background: T.bgRaised, border: "1px solid " + T.borderBright, borderRadius: 4, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderBottom: "1px solid " + T.border }}>
+          <Icon name="search" size={14} color={T.textDim} />
+          <input autoFocus value={q} onChange={e => setQ(e.target.value)}
+            onKeyDown={e => { if (e.key === "Escape") onClose(); if (e.key === "Enter" && filtered[0]) { onJump(filtered[0].id); onClose(); } }}
+            placeholder="Jump to..." style={{ flex: 1, background: "transparent", border: "none", color: T.text, fontFamily: FF.body, fontSize: 14 }} />
+          <span style={{ fontFamily: FF.mono, fontSize: 9, color: T.textFaint, letterSpacing: 1 }}>ESC</span>
+        </div>
+        <div style={{ padding: 8 }}>
+          {filtered.map(it => (
+            <button key={it.id} onClick={() => { onJump(it.id); onClose(); }}
+              style={{ width: "100%", background: "transparent", border: "none", color: T.text, fontFamily: FF.body, fontSize: 13, padding: "10px 12px", display: "flex", alignItems: "center", gap: 11, cursor: "pointer", borderRadius: 2, textAlign: "left" }}
+              onMouseEnter={e => e.currentTarget.style.background = T.surface}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              <Icon name={it.icon} size={14} color={T.textDim} />{it.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------- APP ----------
+const App = () => {
+  const [view, setView] = useState("dashboard");
+  const [palette, setPalette] = useState(false);
+  const [settings, setSettings] = useState(false);
+  const [apiKey, setApiKey] = useState(() => LS.get("api_key", ""));
+  const [model, setModel] = useState(() => LS.get("model", "claude-sonnet-4-6"));
+
+  useEffect(() => {
+    // Open settings on first visit if no key
+    if (!apiKey) setSettings(true);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setPalette(p => !p); }
+      if (e.key === "Escape") { setPalette(false); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  return (
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <TopBar onOpenPalette={() => setPalette(true)} onOpenSettings={() => setSettings(true)} hasKey={!!apiKey} />
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        <Sidebar active={view} onChange={setView} />
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+          {view === "dashboard" && <Dashboard onJump={setView} />}
+          {view === "terminal" && <TerminalView apiKey={apiKey} model={model} />}
+          {view === "focus" && <FocusOS apiKey={apiKey} model={model} />}
+          {view === "email" && <EmailView apiKey={apiKey} model={model} />}
+          {view === "reports" && <ReportsView apiKey={apiKey} model={model} />}
+        </div>
+      </div>
+      <Palette open={palette} onClose={() => setPalette(false)} onJump={setView} />
+      <Settings open={settings} onClose={() => setSettings(false)} apiKey={apiKey} setApiKey={setApiKey} model={model} setModel={setModel} />
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
